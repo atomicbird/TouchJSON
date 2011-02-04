@@ -35,7 +35,13 @@ static NSData *kNULL = NULL;
 static NSData *kFalse = NULL;
 static NSData *kTrue = NULL;
 
+@interface CJSONSerializer ()
+- (NSData *)serializeArray:(NSArray *)inArray error:(NSError **)outError level:(NSUInteger)inLevel;
+- (NSData *)serializeDictionary:(NSDictionary *)inDictionary error:(NSError **)outError level:(NSUInteger)inLevel;
+@end
+
 @implementation CJSONSerializer
+@synthesize format;
 
 + (void)initialize
 {
@@ -56,7 +62,7 @@ if (kTrue == NULL)
 return([[[self alloc] init] autorelease]);
 }
 
-- (NSData *)serializeObject:(id)inObject error:(NSError **)outError
+- (NSData *)serializeObject:(id)inObject error:(NSError **)outError level:(NSUInteger)inLevel
 {
 NSData *theResult = NULL;
 
@@ -74,11 +80,11 @@ else if ([inObject isKindOfClass:[NSString class]])
 	}
 else if ([inObject isKindOfClass:[NSArray class]])
 	{
-	theResult = [self serializeArray:inObject error:outError];
+	theResult = [self serializeArray:inObject error:outError level:inLevel+1];
 	}
 else if ([inObject isKindOfClass:[NSDictionary class]])
 	{
-	theResult = [self serializeDictionary:inObject error:outError];
+	theResult = [self serializeDictionary:inObject error:outError level:inLevel+1];
 	}
 else if ([inObject isKindOfClass:[NSData class]])
 	{
@@ -112,6 +118,11 @@ if (theResult == NULL)
 	return(NULL);
 	}
 return(theResult);
+}
+
+- (NSData *)serializeObject:(id)inObject error:(NSError **)outError
+{
+return [self serializeObject:inObject error:outError level:0];
 }
 
 - (NSData *)serializeNull:(NSNull *)inNull error:(NSError **)outError
@@ -235,37 +246,71 @@ theData.length = OUT - theOutputStart;
 return(theData);
 }
 
-- (NSData *)serializeArray:(NSArray *)inArray error:(NSError **)outError
+- (NSData *)serializeArray:(NSArray *)inArray error:(NSError **)outError level:(NSUInteger)inLevel
 {
 NSMutableData *theData = [NSMutableData data];
 
 [theData appendBytes:"[" length:1];
-
+if (self.format)
+	{
+	[theData appendBytes:"\n" length:1];
+	}
+	
 NSEnumerator *theEnumerator = [inArray objectEnumerator];
 id theValue = NULL;
 NSUInteger i = 0;
 while ((theValue = [theEnumerator nextObject]) != NULL)
 	{
-	NSData *theValueData = [self serializeObject:theValue error:outError];
+	NSData *theValueData = [self serializeObject:theValue error:outError level:inLevel+1];
 	if (theValueData == NULL)
 		{
 		return(NULL);
 		}
+	if ((self.format) && (inLevel > 0))
+		{
+		for (NSUInteger indent=0; indent<inLevel; indent++)
+			{
+			[theData appendBytes:"  " length:2];
+			}
+		}	
+		
 	[theData appendData:theValueData];
 	if (++i < [inArray count])
 		[theData appendBytes:"," length:1];
+		
+	if (self.format)
+		{
+		[theData appendBytes:"\n" length:1];
+		}
 	}
 
+	if ((self.format) && (inLevel > 0))
+		{
+		for (NSUInteger indent=0; indent<inLevel; indent++)
+			{
+			[theData appendBytes:"  " length:2];
+			}
+		}	
+	
 [theData appendBytes:"]" length:1];
-
+	
 return(theData);
 }
 
-- (NSData *)serializeDictionary:(NSDictionary *)inDictionary error:(NSError **)outError
+- (NSData *)serializeArray:(NSArray *)inArray error:(NSError **)outError
+{
+return [self serializeArray:inArray error:outError level:0];
+}
+
+- (NSData *)serializeDictionary:(NSDictionary *)inDictionary error:(NSError **)outError level:(NSUInteger)inLevel
 {
 NSMutableData *theData = [NSMutableData data];
 
 [theData appendBytes:"{" length:1];
+if (self.format)
+	{
+	[theData appendBytes:"\n" length:1];
+	}
 
 NSArray *theKeys = [inDictionary allKeys];
 NSEnumerator *theEnumerator = [theKeys objectEnumerator];
@@ -279,24 +324,58 @@ while ((theKey = [theEnumerator nextObject]) != NULL)
 		{
 		return(NULL);
 		}
-	NSData *theValueData = [self serializeObject:theValue error:outError];
+	NSData *theValueData = [self serializeObject:theValue error:outError level:inLevel+1];
 	if (theValueData == NULL)
 		{
 		return(NULL);
 		}
 	
-	
+	if ((self.format) && (inLevel > 0))
+		{
+		for (NSUInteger indent=0; indent<inLevel; indent++)
+			{
+			[theData appendBytes:"  " length:2];
+			}
+		}
+		
 	[theData appendData:theKeyData];
-	[theData appendBytes:":" length:1];
+	if (self.format)
+		{
+		[theData appendBytes:" : " length:3];
+		}
+	else 
+		{
+		[theData appendBytes:":" length:1];
+		}
 	[theData appendData:theValueData];
 	
 	if (theKey != [theKeys lastObject])
 		[theData appendData:[@"," dataUsingEncoding:NSASCIIStringEncoding]];
+		
+		
+	if (self.format)
+		{
+		[theData appendBytes:"\n" length:1];
+		}
 	}
-
+	
+	if ((self.format) && (inLevel > 0)) 
+		{
+		for (NSUInteger indent=0; indent<inLevel; indent++) 
+			{
+			[theData appendBytes:"  " length:2];
+			}
+		}
+	
 [theData appendBytes:"}" length:1];
 
 return(theData);
 }
+
+- (NSData *)serializeDictionary:(NSDictionary *)inDictionary error:(NSError **)outError
+{
+return [self serializeDictionary:inDictionary error:outError level:0];
+}
+
 
 @end
