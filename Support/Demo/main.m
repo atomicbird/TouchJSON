@@ -29,10 +29,13 @@
 
 #import <Foundation/Foundation.h>
 
+#import "CJSONSerializer.h"
 #import "CJSONDeserializer.h"
 #import "CJSONScanner.h"
 
-void test(void);
+static void test(void);
+static void test_twitter_public_timeline(void);
+
 
 int main(int argc, char **argv)
 	{
@@ -40,29 +43,36 @@ int main(int argc, char **argv)
 
 	NSAutoreleasePool *theAutoreleasePool = [[NSAutoreleasePool alloc] init];
 
-	test();
+    test();
 
 	[theAutoreleasePool release];
 	//
 	return(0);
 	}
 
-void test(void)
+static void test(void)
+    {
+    NSError *theError = NULL;
+    NSData *theData = [@"\"80\u540e\uff0c\u5904\u5973\u5ea7\uff0c\u65e0\u4e3b\u7684\u808b\u9aa8\uff0c\u5b85+\u5fae\u8150\u3002\u5b8c\u7f8e\u63a7\uff0c\u7ea0\u7ed3\u63a7\u3002\u5728\u76f8\u4eb2\u7684\u6253\u51fb\u4e0e\u88ab\u6253\u51fb\u4e2d\u4e0d\u65ad\u6210\u957fing\"" dataUsingEncoding:NSUTF8StringEncoding];
+//    NSData *theData = [@"\"\u062a\u062d\u064a\u0627 \u0645\u0635\u0631!\"" dataUsingEncoding:NSUTF8StringEncoding];
+    NSString *theString = [[CJSONDeserializer deserializer] deserialize:theData error:&theError];
+    theData = [[CJSONSerializer serializer] serializeObject:theString error:&theError];
+    theString = [[[NSString alloc] initWithData:theData encoding:NSUTF8StringEncoding] autorelease];
+    NSLog(@"%@", theString);
+    }
+
+static void test_twitter_public_timeline(void)
 	{
-	CJSONDeserializer *theDeserializer = [CJSONDeserializer deserializer];
-	NSString *jsonString = @"3.14";
-	NSData *jsonData = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
-	NSError *error = nil;
-	NSNumber *theNumber = [theDeserializer deserialize:jsonData error:&error];
-
-//    CJSONDeserializer *theDeserializer = [CJSONDeserializer deserializer];
-//    NSData *theData = [@"14399073641566209" dataUsingEncoding:NSUTF8StringEncoding];
-//	NSNumber *theObject = [theDeserializer deserialize:theData error:nil];
-//	STAssertEquals([theObject unsignedLongLongValue], 14399073641566209ULL, @"Numbers did not contain expected contents");
-
-
-	NSLog(@"Result: %@", [theNumber class]);
-	NSLog(@"Error: %llu", [theNumber unsignedLongLongValue]); 
-	NSLog(@"Error: %g", [theNumber doubleValue]); 
-	NSLog(@"Error: %d", [theNumber unsignedLongLongValue] == 14399073641566209ULL); 
+    NSError *theError = NULL;
+    NSData *inputData = [NSData dataWithContentsOfFile:@"Test Data/atomicbird.json"];
+    NSLog(@"Input data: %ld", inputData.length);
+    id json = [[CJSONDeserializer deserializer] deserialize:inputData error:&theError];
+    NSLog(@"JSON Object: %@ %p (Error: %@)", [json class], json, theError);
+    NSData *jsonData = [[CJSONSerializer serializer] serializeObject:json error:&theError];
+    NSLog(@"%@", jsonData);
+    
+    NSLog(@"JSON data: %ld  (Error: %@)", jsonData.length, theError);
+    NSString *jsonString = [[[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding] autorelease];
+    NSLog(@"JSON string: %ld", jsonString.length);
+    NSLog(@"> %@", jsonString);
 	}
